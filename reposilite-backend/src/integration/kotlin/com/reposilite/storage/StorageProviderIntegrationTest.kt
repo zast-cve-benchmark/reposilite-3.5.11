@@ -1,0 +1,138 @@
+/*
+ * Copyright (c) 2023 dzikoysk
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+@file:Suppress("FunctionName")
+
+package com.reposilite.storage
+
+import com.reposilite.storage.api.DirectoryInfo
+import com.reposilite.storage.api.DocumentInfo
+import com.reposilite.storage.api.FileType.FILE
+import com.reposilite.storage.api.toLocation
+import com.reposilite.storage.specification.StorageProviderSpecification
+import io.javalin.http.ContentType.APPLICATION_JAR
+import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Test
+import panda.std.ResultAssertions.assertError
+import panda.std.ResultAssertions.assertOk
+
+internal abstract class StorageProviderIntegrationTest : StorageProviderSpecification() {
+
+    @Test
+    fun `should store and return valid resource` () {
+        // given: a destination path to the resource and its content
+        val resource = "/directory/file.data".toLocation()
+        val content = "content".toByteArray()
+
+        // when: resource is put in storage and then requested
+        val putResponse = storageProvider.putFile(resource, content.inputStream())
+
+        // then: put request should succeed
+        assertOk(putResponse)
+        assertThat(storageProvider.exists(resource)).isTrue
+
+        // when: stored resource is requested
+        val fetchResponse = storageProvider.getFile(resource)
+
+        // then: provider should return proper resource
+        assertOk(fetchResponse)
+        assertThat(fetchResponse.get().readBytes()).isEqualTo(content)
+    }
+
+    @Test
+    fun `should return error if non-existing resource has been requested` () {
+        // given: some path to the resource that doesn't exist
+        val resource = "/not/found.data".toLocation()
+
+        // when: non-existing resource is requested
+        val nonExistingResource = storageProvider.getFile(resource)
+
+        // then: response should contain error
+        assertError(nonExistingResource)
+    }
+
+    @Test
+    fun `should return valid file details` () {
+        // given: a destination path to the resource and its content
+        val resource = "/directory/file.jar".toLocation()
+        val content = "content".toByteArray()
+        storageProvider.putFile(resource, content.inputStream())
+
+        // when: file details are requested
+        val response = storageProvider.getFileDetails(resource)
+
+        // then: response should contain expected file details
+        val fileDetails = assertOk(response) as DocumentInfo
+        assertThat(fileDetails.type).isEqualTo(FILE)
+        assertThat(fileDetails.name).isEqualTo(resource.getSimpleName())
+        assertThat(fileDetails.contentLength).isEqualTo(content.size.toLong())
+        assertThat(fileDetails.contentType).isEqualTo(APPLICATION_JAR)
+    }
+
+    @Test
+    fun `should list entries in directory`() {
+        // given: a storage provider with multiple files in multiple directories
+        mapOf(
+            "/a/a.jar" to "a in a content",
+            "/a/b.jar" to "b in a content",
+            "/a/c/a.jar" to "a in c content",
+            "/b/a.jar" to "a in b content",
+            "/b/b.jar" to "b in b content"
+        ).forEach { (location, content) ->
+            storageProvider.putFile(location.toLocation(), content.byteInputStream())
+        }
+
+        // when: file details are requested
+        val response = storageProvider.getFileDetails("/a".toLocation())
+
+        // then: response should contain directory details with list of subnames
+        val fileDetails = assertOk(response) as DirectoryInfo
+        assertThat(fileDetails.files.map { it.name }).isEqualTo(listOf("c", "a.jar", "b.jar"))
+    }
+
+    @Test
+    fun `should delete file`() {
+        // given: a file in storage provider
+        storageProvider.putFile("/test/test1.jar".toLocation(), "content".byteInputStream())
+        storageProvider.putFile("/test/test2.jar".toLocation(), "content".byteInputStream())
+
+        // when: given file is deleted
+        val response = storageProvider.removeFile("/test/test1.jar".toLocation())
+
+        // then: storage provider should not contain deleted file
+        assertOk(response)
+        assertThat(storageProvider.exists("/test/test1.jar".toLocation())).isFalse
+        assertThat(storageProvider.exists("/test/test2.jar".toLocation())).isTrue
+    }
+
+    @Test
+    fun `should delete directory with files`() {
+        // given: a directory with file & subdirectory in storage provider
+        storageProvider.putFile("/directory/sub/sub/test.jar".toLocation(), "content".byteInputStream())
+        storageProvider.putFile("/directory/sub/test.jar".toLocation(), "content".byteInputStream())
+        storageProvider.putFile("/directory/test.jar".toLocation(), "content".byteInputStream())
+
+        // when: root directory is deleted
+        val response = storageProvider.removeFile("/directory/sub".toLocation())
+
+        // then: storage provider should not contain any of deleted files
+        assertOk(response)
+        assertThat(storageProvider.exists("/directory/sub/sub/test.jar".toLocation())).isFalse
+        assertThat(storageProvider.exists("/directory/sub/test.jar".toLocation())).isFalse
+        assertThat(storageProvider.exists("/directory/test.jar".toLocation())).isTrue
+    }
+
+}
