@@ -1,0 +1,27 @@
+name: Bug Report
+description: Report a bug or a problem you've found in Reposilite
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Also tell us about the full context and your environment to simplify process of bug reproduction
+    validations:
+      required: true
+  - type: dropdown
+    id: version
+    attributes:
+      label: Reposilite version
+      description: Remember that Reposilite 2.x may receive only major security updates, because the currently developed version is 3.x
+      options:
+        - 3.x
+        - 2.x
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log output
+      description: Please copy and paste any relevant log output. This will be automatically formatted into code, so no need for backticks.
+      render: shell

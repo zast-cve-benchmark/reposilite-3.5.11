@@ -1,0 +1,11 @@
+name: Feature Request
+description: Request a new feature or an enhancement to the existing one
+labels: ["triage"]
+body:
+  - type: textarea
+    id: request-details
+    attributes:
+      label: Request details
+      description: Try to precisely explain your request and how it may improve Reposilite
+    validations:
+      required: true
