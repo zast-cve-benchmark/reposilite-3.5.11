@@ -110,7 +110,7 @@ dependencies {
     val commonsCoded = "1.16.1"
     api("commons-codec:commons-codec:$commonsCoded")
 
-    val jansi = "2.4.1"
+    val jansi = "2.4.3"
     implementation("org.fusesource.jansi:jansi:$jansi")
 
     val journalist = "1.0.10"
